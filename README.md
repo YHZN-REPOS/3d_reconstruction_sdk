@@ -4,7 +4,7 @@
 
 ## 文档说明
 
-关于 MipMap SDK 集成和研究的详细文档请见 `docs/` 目录：111
+关于 MipMap SDK 集成和研究的详细文档请见 `docs/` 目录：
 
 *   **[集成指南 (CLI & JSON)](docs/mipmap_sdk_integration_examples.md)**
     *   详细说明如何通过命令行 (`reconstruct_full_engine`) 调用 MipMap 引擎。
