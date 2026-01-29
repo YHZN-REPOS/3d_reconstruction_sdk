@@ -1,0 +1,52 @@
+# =============================================================================
+# 3D Reconstruction SDK Configuration
+# =============================================================================
+# 将此 config.yaml 放在您的项目目录下（与 images/ 目录同级）。
+# working_dir 将自动从此文件的位置推断。
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. 基础配置 (面向普通用户)
+# -----------------------------------------------------------------------------
+
+# --- 任务开关 ---
+run_sparse: true      # 稀疏重建 (SfM) - 必选，作为后续步骤的基础
+run_mesh: false       # 3D 网格生成 (由 ODM 完成)
+run_gaussian: true    # 高斯溅射模型生成
+
+# --- 核心参数 ---
+quality_preset: medium  # 重建质量预设: high (高质量/耗时), medium (默认), low (快速预览)
+use_gps: true           # 是否利用照片中的 GPS 信息进行空三加速和地理对齐
+
+# --- 相机参数 (可选) ---
+# SDK 默认会自动读取 EXIF 信息。如需手动指定相机模型：
+camera:
+  model: perspective    # 常用模型: perspective (透视), fisheye (鱼眼), brown (畸变校正)
+
+
+# -----------------------------------------------------------------------------
+# 2. 进阶配置 (面向算法工程师)
+# -----------------------------------------------------------------------------
+
+# --- 算法后端选择 ---
+algorithms:
+  sfm: opensfm
+  reconstruction: opensplat
+  sfm_docker_image: opendronemap/odm:latest
+  reconstruction_docker_image: opensplat:latest
+
+# --- 算法级细调 ---
+feature_type: sift      # 关键点提取算法: sift (最稳健), akaze, hahog
+sh_degree: 3            # 高斯溅射球谐函数阶数 (1-3)，影响色彩丰富度
+
+# --- 性能与系统 ---
+thread_num: 8           # 并行处理线程数
+video_memory_limit: 8192 # 显存限制 (MB)
+
+# --- 深度参数透传 ---
+# 可以直接向底层工具（如 OpenSfM 或 OpenSplat）传递特定参数
+params:
+  opensfm:
+    feature_process_size: 2048
+  opensplat:
+    iterations: 15000

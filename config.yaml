@@ -1,0 +1,22 @@
+# working_dir will be auto-inferred from this file's location
+# Put this config.yaml in your project directory alongside images/ folder
+
+thread_num: 8
+run_sparse: true      # SfM (Structure from Motion)
+run_mesh: false       # 3D Mesh (via ODM)
+run_gaussian: true   # Gaussian Splatting
+
+use_gps: true
+quality_preset: medium
+feature_type: sift
+sh_degree: 3
+
+algorithms:
+  sfm: opensfm
+  reconstruction: opensplat
+  sfm_docker_image: opendronemap/odm:gpu
+  reconstruction_docker_image: opensplat-dev:latest
+
+params: 
+  opensplat:
+    iterations: 2000

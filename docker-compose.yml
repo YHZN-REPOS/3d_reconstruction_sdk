@@ -1,0 +1,82 @@
+# =============================================================================
+# PATH CONFIGURATION NOTES:
+# =============================================================================
+# This SDK uses Docker-out-of-Docker (DooD) architecture.
+#
+# USAGE:
+#   1. Set DATA_DIR to your project directory (containing images/)
+#   2. Optional: Set CONFIG_FILE if config.yaml is not in DATA_DIR
+#   3. working_dir will be auto-inferred from config.yaml location
+#
+# Example (Default):
+#   /home/user/my_project/
+#   ├── config.yaml
+#   └── images/
+#
+#   DATA_DIR=/home/user/my_project docker compose run --rm sdk
+# =============================================================================
+
+services:
+  sdk:
+    build: .
+    image: recon3d-sdk:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Sync time with host
+      - /etc/localtime:/etc/localtime:ro
+      # Mount DATA_DIR at the same path inside container
+      # Mount DATA_DIR to fixed /project path
+      - ${DATA_DIR}:/project
+      # Mount CONFIG_FILE to fixed container path
+      - ${CONFIG_FILE:-${DATA_DIR}/config.yaml}:/tmp/config.yaml
+    environment:
+      - DATA_DIR=/project
+      - HOST_DATA_DIR=${DATA_DIR}
+      - CONFIG_FILE=/tmp/config.yaml
+      - PYTHONUNBUFFERED=1
+      - RESUME_ID=${RESUME_ID}
+    command: ["--config", "/tmp/config.yaml"]
+
+  # Development mode: mounts local code, no rebuild needed
+  sdk-dev:
+    build: .
+    image: recon3d-sdk:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+      - ${DATA_DIR}:/project
+      # Mount CONFIG_FILE to fixed container path
+      - ${CONFIG_FILE:-${DATA_DIR}/config.yaml}:/tmp/config.yaml
+      # Mount local code for hot-reload development
+      - ./my_sdk:/app/my_sdk
+    environment:
+      - DATA_DIR=/project
+      - HOST_DATA_DIR=${DATA_DIR}
+      - CONFIG_FILE=/tmp/config.yaml
+      - PYTHONUNBUFFERED=1
+      - RESUME_ID=${RESUME_ID}
+    command: ["--config", "/tmp/config.yaml"]
+    profiles:
+      - dev
+
+  # Shell mode: enter container for debugging/cleanup
+  # Usage: docker compose --profile shell run --rm shell
+  shell:
+    build: .
+    image: recon3d-sdk:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+      - ${DATA_DIR}:/project
+      - ${CONFIG_FILE:-${DATA_DIR}/config.yaml}:/tmp/config.yaml
+      - ./my_sdk:/app/my_sdk
+    environment:
+      - DATA_DIR=/project
+      - HOST_DATA_DIR=${DATA_DIR}
+      - CONFIG_FILE=/tmp/config.yaml
+      - PYTHONUNBUFFERED=1
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true
+    profiles:
+      - shell

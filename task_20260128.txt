@@ -1,0 +1,15 @@
+# 由于目录是图片和任务分别放在project/images和project/runs/xxxxxx，
+# 所以执行opensplat需要用参数--opensfm-image-path指定images路径，
+# 新的docker执行命令类似于下面，你可以做更进一步的优化，例如/datasets/code就可以改成比较恰当的命名
+# 存放的结果可以新建一个3d_gsl文件夹专门存放结果
+
+docker run -it --rm \
+-v /home/user1/guoyujian/data/M3E-power-tower-90/runs/20260127_172334:/datasets/code \
+-v /home/user1/guoyujian/data/M3E-power-tower-90/images:/images \
+--gpus all \
+opensplat-dev:latest \
+opensplat -o /datasets/code/result.ply \
+/datasets/code \
+-n 2000 \
+-s 1000 \
+--opensfm-image-path /images

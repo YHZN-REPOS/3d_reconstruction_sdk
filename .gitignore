@@ -1,0 +1,35 @@
+# --- Data & Outputs ---
+# Reconstruction results (large binaries and massive intermediate files)
+runs/
+images/
+*.ply
+*.json
+!my_sdk/**/*.json
+
+# --- Environment ---
+.env
+.venv/
+env/
+venv/
+.python-version
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+*.egg-info/
+dist/
+build/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
