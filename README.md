@@ -4,15 +4,23 @@
 
 ## 文档说明
 
-关于 MipMap SDK 集成和研究的详细文档请见 `docs/` 目录：
+`docs/` 目录下提供了完善的技术文档体系：
 
-*   **[集成指南 (CLI & JSON)](docs/mipmap_sdk_integration_examples.md)**
-    *   详细说明如何通过命令行 (`reconstruct_full_engine`) 调用 MipMap 引擎。
-    *   包含 `task_json` 配置文件的完整参考，包括所有支持参数的列表和一个有效的 JSON 示例。
-    
-*   **[研究报告](docs/mipmap_sdk_research_report.md)**
-    *   MipMap SDK 能力的高层概览。
-    *   总结支持的输入数据（航拍影像、激光雷达）和输出格式（OSGB, 3D Tiles, OBJ 等）。
+### 核心文档（推荐阅读）
+
+*   **[用户使用手册](docs/user_guide.md)** ⭐
+    *   **快速开始**：从安装依赖、准备数据到运行重建的完整步骤。
+    *   **配置说明**：基础参数与进阶参数的详细解读。
+    *   **运行方式**：命令行、Python 代码、Docker 容器等多种执行方式。
+    *   **常见问题**：GPU 配置、内存不足等问题的排查指南。
+
+*   **[架构设计说明书](docs/architecture_design.md)**
+    *   SDK 的模块化架构、DooD 调度机制与数据流向。
+
+### 参考文档
+
+*   **[MipMap SDK 集成指南](docs/mipmap_sdk_integration_examples.md)** - CLI 与 JSON 配置参考
+*   **[MipMap SDK 研究报告](docs/mipmap_sdk_research_report.md)** - 能力概览与格式支持
 
 ## 架构与路线图 (Architecture & Roadmap)
 

@@ -1,69 +1,84 @@
-# MipMap Engine SDK Research Report
+# MipMap Engine SDK 研究报告
 
-**Date:** 2026-01-23
-**Subject:** Capabilities and Technical Overview of MipMap Engine SDK
-**Source:** [MipMap 3D Documentation](https://docs.mipmap3d.com/engine/zh-Hans/)
+**日期：** 2026-01-30 (Updated)
+**来源：** [MipMap 官方文档](https://docs.mipmap3d.com/engine/zh-Hans/)
 
 ---
 
-## 1. Executive Summary
-The MipMap Engine SDK is a professional-grade, cross-platform 3D reconstruction engine designed for developers. It enables the automated conversion of aerial imagery and LiDAR data into high-precision 3D models and geospatial products. Operating as a Command Line Interface (CLI) tool, it allows for seamless integration into backend systems across various programming languages.
+## 1. 概述
+MipMap Engine SDK 是一款专业的、跨平台的三维重建引擎，面向开发者集成。它能够将航拍影像和激光雷达数据自动转换为高精度三维模型和地理空间产品。SDK 以命令行 (CLI) 形式提供，可无缝集成到 Python、Node.js、C++ 等多种语言的后端系统中。
 
-## 2. Core Capabilities
+## 2. 核心能力 (6 大功能)
 
-### 2.1 Photogrammetry Pipeline
-The SDK provides a complete end-to-end pipeline for image-based reconstruction:
-- **Aerial Triangulation (AT)**: Automatically solves camera poses and sparse point clouds. Supports GPS/POS data and Ground Control Points (GCPs) for high georeferencing accuracy (`OptimizeAT`).
-- **Dense Matching**: Generates high-density point clouds from stereo image pairs.
-- **Mesh Reconstruction**: Builds detailed triangular meshes from point clouds.
-- **Texture Mapping**: Applies high-resolution textures to meshes for photorealistic visualization.
+根据官方文档，SDK 提供以下核心功能：
 
-### 2.2 Advanced Reconstruction Features
-- **LiDAR Support**: Native capability to process laser scanning point clouds into surfaces.
-- **Gaussian Splatting**: Support for the latest Neural Rendering techniques to generate 3D Gaussian Splatting models for next-gen real-time rendering.
-- **Large-Scale Processing**:
-    - **DivideTiles**: Automatically segments large datasets into manageable tiles for parallel processing.
-    - **LOD Generation**: Creates Level of Detail hierarchies for efficient streaming and rendering of massive scenes.
-- **Real-Time Reconstruction**: Stream-based processing for immediate visualization (e.g., emergency response).
-
-## 3. Technical Specifications
-
-### 3.1 Supported Input Data
-| Data Type | Description |
-| :--- | :--- |
-| **Imagery** | JPEG/TIFF from multi-lens slants, orthographic cameras, or consumer drones. Reads EXIF/XMP for sensor data. |
-| **LiDAR** | Standard point cloud formats for geometry input. |
-| **Control** | Ground Control Points (GCPs) for geodetic correction. |
-
-### 3.2 Output Formats
-The SDK covers the full spectrum of industry-standard formats:
-
-| Category | Formats | Use Case |
+| # | 功能 | 说明 |
 | :--- | :--- | :--- |
-| **3D Mesh** | `.obj`, `.ply` | General 3D editing (Blender, Maya, MeshLab) |
-| **GIS / Survey** | `.osgb` (Smart3D) | Professional GIS software, supporting LOD and paging |
-| **Web / VR** | `3D Tiles`, `.pnts` | WebGL streaming (CesiumJS, Unreal Engine) |
-| **Point Cloud** | `.las`, `.ply`, `.osgb` | Analysis, classification |
-| **2D Map Products** | `GeoTIFF` (DOM/DSM) | Orthophotos and Digital Surface Models for mapping |
-| **Neural/NeRF** | `.ply`, `.sog` | Gaussian Splatting viewers |
+| 1 | **空中三角测量 (AT)** | 全自动计算图像位置和姿态 |
+| 2 | **三维模型生成** | 从图像生成高质量三维纹理网格模型 |
+| 3 | **正射影像/数字表面模型生成** | 创建真正射影像 (DOM) 和数字表面模型 (DSM) |
+| 4 | **高斯泼溅生成** | 生成用于逼真渲染的高斯泼溅 (Gaussian Splatting) 成果 |
+| 5 | **实时重建** | "边飞边出图"，秒级实时获取二三维重建成果 |
+| 6 | **激光雷达重建** | 输入激光雷达数据，生成三维网格模型和高斯泼溅成果 |
 
-### 3.3 System Integration
-- **Interface**: Command Line Interface (CLI).
-- **Execution**: Can be invoked via `subprocess` (Python), `exec` (Node.js), `system` (C++), etc.
-- **OS Support**: Windows x64, Linux.
-- **Automation**: Features a `reconstruct_full_engine` executable that supports full pipeline automation via the `--reconstruct_type 0` argument.
+## 3. API 接口分类
 
-## 4. Integration Workflow Example
-A typical integration pattern for a backend service:
+SDK 通过 `reconstruct_type` 参数区分不同的接口：
 
-1.  **Ingest**: User uploads images to server storage.
-2.  **Trigger**: Backend service constructs a CLI command:
-    ```bash
-    # Example pseudo-command
-    reconstruct_full_engine --reconstruct_type 0 --task_json /data/mission_01/config.json
-    ```
-3.  **Process**: SDK runs in the background (optionally reporting progress via stdout/logs).
-4.  **Deliver**: Generated `.osgb` or `3D Tiles` are served to the frontend.
+| 接口名称 | Type | 说明 |
+| :--- | :--- | :--- |
+| **ReconstructFull** | 0 | **一键全流程重建（推荐）**，从图像到最终成果全自动。 |
+| **ReconstructAT** | - | 仅执行空中三角测量。 |
+| **Reconstruct3D** | - | 仅执行三维模型/点云生成。 |
+| **OptimizeAT** | - | 基于控制点优化空三结果。 |
+| **DivideTiles** | - | 将大规模数据分块处理。 |
 
-## 5. Conclusion
-MipMap Engine SDK effectively abstracts the complex mathematics of photogrammetry into a set of engineering tools using `Structure from Motion (SfM)` and Multi-View Stereo (MVS)`and other technologies. It is suitable for building custom cloud photogrammetry platforms, automated mapping pipelines, or embedding reconstruction capabilities into local desktop software.
+> 官方推荐：对于大多数场景，直接使用 `ReconstructFull` (Type=0) 即可完成全流程。
+
+## 4. 系统要求
+
+| 项目 | 要求 |
+| :--- | :--- |
+| **操作系统** | Windows 10+ 或 Linux |
+| **显卡** | NVIDIA GPU (GTX 1050Ti 或更高) |
+| **驱动版本** | Windows ≥ 528.33, Linux ≥ 525.60.33 |
+| **内存** | 16GB RAM (推荐 32GB+) |
+| **存储** | 至少 500GB 可用空间 |
+
+## 5. 输出格式
+
+SDK 支持以下行业标准输出格式：
+
+| 类别 | 格式 | 典型用途 |
+| :--- | :--- | :--- |
+| **3D 网格** | `.obj`, `.ply` | 通用 3D 编辑器 (Blender, Maya) |
+| **GIS / 测量** | `.osgb` (Smart3D) | 专业 GIS 软件，支持 LOD 和分页 |
+| **Web / VR** | `3D Tiles`, `.pnts` | WebGL 流式加载 (CesiumJS, Unreal) |
+| **点云** | `.las`, `.ply` | 分析与分类 |
+| **二维成果** | `GeoTIFF` (DOM/DSM) | 正射影像与数字表面模型 |
+| **神经渲染** | `.ply`, `.sog` | 高斯泼溅查看器 |
+
+## 6. 快速开始
+
+### 6.1 交互式配置生成器
+官方提供了一个基于 Web 的**交互式 JSON 配置生成器**，可拖入图像自动生成配置文件：
+👉 [点击打开交互式页面](https://mipmap3d.com/tasks_generator/#/)
+
+### 6.2 命令行调用
+
+```bash
+# 通用格式
+reconstruct_full_engine --reconstruct_type <type_number> --task_json <config_task_file.json>
+
+# 示例：一键全流程重建 (Type=0)
+reconstruct_full_engine --reconstruct_type 0 --task_json config_task.json
+```
+
+> **Linux Docker 部署**：`reconstruct_full_engine` 可执行程序存放在容器的 `mipmap_engine` 目录下。
+
+## 7. 延伸阅读
+
+- [ReconstructFull 接口详解](https://docs.mipmap3d.com/engine/zh-Hans/api-reference/reconstruct-full)
+- [高级参数配置](https://docs.mipmap3d.com/engine/zh-Hans/api-reference/advanced-config)
+- [实时重建 API 指南](https://docs.mipmap3d.com/engine/zh-Hans/api-reference/realtime)
+- [激光雷达重建 API 指南](https://docs.mipmap3d.com/engine/zh-Hans/api-reference/lidar)
