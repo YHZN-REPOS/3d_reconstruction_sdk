@@ -43,6 +43,8 @@ run_gaussian: true
 
 ### 3. 运行
 
+> 首先请按照下方 [安装要求](#安装要求) 完成环境配置。
+
 ```bash
 python -m my_sdk.main --config config.yaml
 ```
@@ -79,10 +81,17 @@ python -m my_sdk.main --config config.yaml
 ### 安装步骤
 
 ```bash
-# 1. 安装 SDK
+# 1. 克隆代码仓库
+git clone git@github.com:YHZN-REPOS/3d_reconstruction_sdk.git
+cd 3d_reconstruction_sdk
+
+# 2. 安装 Python 依赖
+pip install pyyaml pydantic
+
+# 3. 安装 SDK 本体（开发模式）
 pip install -e .
 
-# 2. 拉取 Docker 镜像
+# 4. 拉取 Docker 镜像
 docker pull opendronemap/odm:latest
 docker pull opensplat:latest
 ```
@@ -141,21 +150,20 @@ params:
 python -m my_sdk.main --config config.yaml
 ```
 
-### 方式二：Python 代码
+### 方式二：Python 代码调用
 
 ```python
 from my_sdk.core.config import TaskConfig
 from my_sdk.core.pipeline import ReconstructionPipeline
 
-# 从配置文件加载 (working_dir 自动推断)
+# 从配置文件加载
 config = TaskConfig.from_file("/data/my_project/config.yaml")
 
-# 或手动指定 working_dir
-# config = TaskConfig(working_dir="/data/my_project", quality_preset="high")
-
-# 运行
-pipeline = ReconstructionPipeline(config)
+# 初始化并运行 Pipeline
+pipeline = ReconstructionPipeline(config, config_file_path="/data/my_project/config.yaml")
 success = pipeline.run()
+
+print("重建成功" if success else "重建失败")
 ```
 
 ### 方式三：分阶段执行
@@ -182,7 +190,7 @@ python -m my_sdk.main --config config.yaml
 
 SDK 会自动跳过已完成的步骤（如 SfM），直接从失败或未运行的项目继续。
 
-### 方式四：Docker 容器化运行
+### 方式五：Docker 容器化运行
 
 项目提供 Dockerfile 和 docker-compose.yml，可将 SDK 容器化部署。
 
