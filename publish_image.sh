@@ -38,20 +38,11 @@ git add .
 # 允许无变更提交（用于仅重新打标签的情况，虽然不推荐）
 git commit -m "chore: release version $VERSION" || echo "提醒: 无代码变更需要提交"
 
-echo "[4/4] 正在检查并创建 Git 标签 (v$VERSION)..."
-# 修正后的逻辑：如果标签已存在，报错并退出，保护版本唯一性
+echo "[4/4] 正在处理 Git 标签 (v$VERSION)..."
+# 如果标签已存在，先删除本地标签，以便重新打标
 if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-    echo ""
-    echo "================================================================="
-    echo "❌ 错误: 标签 v$VERSION 已存在！"
-    echo "-----------------------------------------------------------------"
-    echo "为了防止版本回溯和代码混乱，不允许覆盖已发布的版本标签。"
-    echo "建议操作："
-    echo "  1. 修改 .env 中的 VERSION 递增版本号 (如 1.0.1 -> 1.0.2)"
-    echo "  2. 如果您确信要覆盖本地标签且尚未推送，请手动运行:"
-    echo "     git tag -d v$VERSION"
-    echo "================================================================="
-    exit 1
+    echo "提醒: 标签 v$VERSION 已存在，正在删除并重新提交..."
+    git tag -d "v$VERSION"
 fi
 
 git tag -a "v$VERSION" -m "Release version $VERSION"
