@@ -108,11 +108,43 @@ class ReconstructionPipeline:
         print("=== Starting 3D Reconstruction Pipeline ===")
         print(f"Plan: {[step.name for _, step in steps_to_run]}")
         
+        from datetime import datetime
+        self.context.start_time = datetime.now()
+        
+        all_success = True
         for stage_name, step in steps_to_run:
             print(f"--- Stage: {step.name} ---")
-            if not step.run(self.context):
-                print(f"Pipeline aborted at step: {step.name}")
-                return False
+            stage_start = datetime.now()
             
-        print("=== Pipeline Completed Successfully ===")
-        return True
+            success = step.run(self.context)
+            
+            stage_end = datetime.now()
+            duration = (stage_end - stage_start).total_seconds()
+            
+            # Store duration in metrics
+            if stage_name not in self.context.metrics:
+                self.context.metrics[stage_name] = {}
+            self.context.metrics[stage_name]["duration_seconds"] = duration
+            
+            if not success:
+                print(f"Pipeline aborted at step: {step.name}")
+                all_success = False
+                break
+            
+        self.context.end_time = datetime.now()
+        self.context.total_duration = (self.context.end_time - self.context.start_time).total_seconds()
+        
+        if all_success:
+            print("=== Pipeline Completed Successfully ===")
+        
+        self._generate_quality_report()
+        return all_success
+
+    def _generate_quality_report(self):
+        """Invoke the report engine to produce Chinese quality metrics."""
+        from my_sdk.core.report_engine import ReportEngine
+        try:
+            engine = ReportEngine(self.context)
+            engine.generate()
+        except Exception as e:
+            print(f"Warning: Failed to generate quality report: {e}")

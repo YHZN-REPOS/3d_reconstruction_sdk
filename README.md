@@ -9,18 +9,25 @@
 ### 核心文档（推荐阅读）
 
 *   **[用户使用手册](docs/user_guide.md)** ⭐
-    *   **快速开始**：从安装依赖、准备数据到运行重建的完整步骤。
-    *   **配置说明**：基础参数与进阶参数的详细解读。
-    *   **运行方式**：命令行、Python 代码、Docker 容器等多种执行方式。
-    *   **常见问题**：GPU 配置、内存不足等问题的排查指南。
-
+    *   快速开始、配置说明、运行方式及常见问题排查指南。
+*   **[开发者指南](docs/developer_guide.md)**
+    *   SDK 核心代码逻辑、接口设计、流程调度与适配器开发规范。
+*   **[发布工作流](docs/release_workflow.md)** 🆕
+    *   算法迭代后的镜像打包、版本管理（SemVer）与 Git 提交同步流程。
 *   **[架构设计说明书](docs/architecture_design.md)**
-    *   SDK 的模块化架构、DooD 调度机制与数据流向。
+    *   系统层面的模块化架构、DooD 调度机制与跨容器数据流向。
 
-### 参考文档
+### 研究与参考
 
-*   **[MipMap SDK 集成指南](docs/mipmap_sdk_integration_examples.md)** - CLI 与 JSON 配置参考
-*   **[MipMap SDK 研究报告](docs/mipmap_sdk_research_report.md)** - 能力概览与格式支持
+*   **[SDK 竞品分析](docs/sdk_comparison.md)**：对比本 SDK 与 Pix4D、ContextCapture 等商业软件。
+*   **[MipMap SDK 集成指南](docs/mipmap_sdk_integration_examples.md)**：底层 CLI 工具与 JSON 参数的详细参考。
+*   **[MipMap SDK 研究报告](docs/mipmap_sdk_research_report.md)**：算法能力、性能指标与格式支持评估报告。
+
+### 规划与执行报告
+
+*   **[项目进度报告](docs/project_status_report.md)**：各阶段开发进度、已完成功能与待办事项记录。
+*   **[产品推广路线图](docs/promotion_roadmap.md)**：本 SDK 的商业化路径与未来技术演进规划。
+*   **[ODM 示例报告 (PDF)](docs/odm_demo_report.pdf)**：OpenDroneMap 产生的原始质量报告示例。
 
 ## 架构与路线图 (Architecture & Roadmap)
 

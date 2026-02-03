@@ -88,6 +88,7 @@ class DockerRunner:
             
             for line in process.stdout:
                 line = line.rstrip('\n\r')
+                line = self._strip_ansi(line) # Remove ANSI color codes
                 logs.append(line)
                 
                 # Log to console
@@ -142,25 +143,31 @@ class DockerRunner:
 
     
     @staticmethod
-    def check_gpu_support(docker_image: str = "busybox") -> bool:
+    def check_gpu_support() -> bool:
         """
-        Check if docker supports --gpus all by running a minimal command.
+        Check if docker supports --gpus all by running a minimal command with alpine.
         """
         import subprocess
         try:
-            # Use a very fast command to probe
-            # We try using the provided image or fall back to busybox/alpine if available
-            probe_cmd = ["docker", "run", "--rm", "--gpus", "all", docker_image, "true"]
+            # Use alpine for a fast, lightweight probe. 
+            # If alpine is missing, it will pull it (very fast).
+            probe_cmd = ["docker", "run", "--rm", "--gpus", "all", "alpine", "true"]
             result = subprocess.run(
                 probe_cmd, 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE,
-                timeout=15,
+                timeout=20,
                 text=True
             )
             return result.returncode == 0
         except Exception:
-            return False
+            # Fallback check: see if 'nvidia-smi' exists on host as a hint
+            try:
+                subprocess.run(["nvidia-smi"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                # If host has nvidia-smi but probe failed, it might be a docker-specific issue
+                return False 
+            except:
+                return False
 
     def _extract_progress(self, line: str) -> Optional[float]:
         """
@@ -181,6 +188,12 @@ class DockerRunner:
         
         return None
     
+    @staticmethod
+    def _strip_ansi(text: str) -> str:
+        """Remove ANSI escape sequences (colors, etc.) from string."""
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', text)
+
     def _save_logs(self, log_file: Path, logs: List[str], return_code: int):
         """Save logs to file with metadata."""
         with open(log_file, 'w', encoding='utf-8') as f:

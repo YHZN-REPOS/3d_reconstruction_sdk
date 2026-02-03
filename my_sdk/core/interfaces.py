@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 import shutil
 from .config import TaskConfig
 
@@ -30,16 +31,25 @@ class ReconstructionContext:
             print(f"[Pipeline] Creating new run directory: {self.run_dir}")
         
         # All outputs go under run_dir
+        # Note: ODM auto-creates these directories, we only define paths for reference
         self.sparse_model_path: Path = self.run_dir / "sparse"
         self.dense_model_path: Path = self.run_dir / "dense"
         self.result_path: Path = self.run_dir / "result"
         self.log_path: Path = self.run_dir / "logs"
+        self.metrics: dict = {}  # Store quality metrics from different stages
         
-        # Create working directories (idempotent if they exist)
+        # Execution Statistics
+        self.start_time: Optional[datetime] = None
+        self.end_time: Optional[datetime] = None
+        self.total_duration: Optional[float] = None # in seconds
+        
+        # Photo count
+        self.photo_count: int = 0
+        self._count_photos(config.input_images_dir)
+        
+        # Create only essential directories (log_path for our logs)
+        # ODM/OpenSplat will auto-create their output directories
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        self.sparse_model_path.mkdir(parents=True, exist_ok=True)
-        self.dense_model_path.mkdir(parents=True, exist_ok=True)
-        self.result_path.mkdir(parents=True, exist_ok=True)
         self.log_path.mkdir(parents=True, exist_ok=True)
         
         # Copy config file to run directory for reproducibility
@@ -50,6 +60,14 @@ class ReconstructionContext:
                 dest_config = self.run_dir / src_config.name
                 shutil.copy2(src_config, dest_config)
                 print(f"[Pipeline] Config saved: {dest_config}")
+
+    def _count_photos(self, images_dir: str):
+        """Count actual image files in input directory."""
+        path = Path(images_dir)
+        if path.exists():
+            # ODM supports JPG, TIFF
+            extensions = [".jpg", ".jpeg", ".JPG", ".JPEG", ".tif", ".tiff", ".TIF", ".TIFF"]
+            self.photo_count = len([f for f in path.glob("*") if f.suffix in extensions])
 
 class PipelineStep(ABC):
     """

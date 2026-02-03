@@ -31,7 +31,8 @@ class OpenSplatAdapter(ReconstructionStrategy):
         
         # 2. Build Splat Parameters
         splat_params = {
-            "sh-degree": context.config.sh_degree
+            "sh-degree": context.config.sh_degree,
+            "keep-crs": True  # Maintain original point cloud scale and CRS
         }
         
         # Mapping quality logic
@@ -59,14 +60,17 @@ class OpenSplatAdapter(ReconstructionStrategy):
             raise ValueError("HOST_DATA_DIR environment variable is missing. Required for DooD.")
 
         # Reconstruct host paths
+        images_src = Path(context.config.input_images_dir)
         rel_run_path = context.run_dir.relative_to(context.config.working_dir)
+        rel_images_path = images_src.relative_to(context.config.working_dir)
+        
         host_run_dir = Path(host_data_dir) / rel_run_path
-        host_images_dir = Path(host_data_dir) / "images"
+        host_images_dir = Path(host_data_dir) / rel_images_path
         
         docker_image = context.config.algorithms.reconstruction_docker_image
         
         # Check GPU availability
-        use_gpu = DockerRunner.check_gpu_support(docker_image)
+        use_gpu = DockerRunner.check_gpu_support()
         if not use_gpu:
             print("[OpenSplat] WARNING: GPU not available or nvidia-docker not configured. Attempting CPU-only reconstruction.")
             print("[OpenSplat] TIP: Gaussian Splatting is extremely slow on CPU. For better performance, please use an NVIDIA GPU.")
@@ -77,13 +81,12 @@ class OpenSplatAdapter(ReconstructionStrategy):
         container_output = f"{container_project}/3d_gsl/splat.ply"
         
         # Build Docker command
-        # Structure:
-        #   -v {host_run_dir}:/project     -> SfM results (opensfm/ directory)
-        #   -v {host_images_dir}:/images   -> Input images (read-only)
         command = [
             "docker", "run", "--rm",
             "-v", f"{host_run_dir}:{container_project}",
             "-v", f"{host_images_dir}:{container_images}:ro",
+            "-e", "NVIDIA_VISIBLE_DEVICES=all",
+            "-e", "NVIDIA_DRIVER_CAPABILITIES=all",
             docker_image,
             "opensplat",
             container_project,                          # Input: OpenSfM project directory
@@ -97,15 +100,75 @@ class OpenSplatAdapter(ReconstructionStrategy):
         
         # Add splat parameters
         for k, v in splat_params.items():
-            if len(k) == 1:
-                command.extend([f"-{k}", str(v)])   # Short option: -n, -s
+            if isinstance(v, bool):
+                if v:  # Only add boolean flags if True (e.g., --keep-crs)
+                    if len(k) == 1:
+                        command.append(f"-{k}")
+                    else:
+                        command.append(f"--{k}")
             else:
-                command.extend([f"--{k}", str(v)])  # Long option: --sh-degree
+                if len(k) == 1:
+                    command.extend([f"-{k}", str(v)])   # Short option: -n, -s
+                else:
+                    command.extend([f"--{k}", str(v)])  # Long option: --sh-degree
 
         # 4. Execute using DockerRunner
         success = runner.run(command, step_name="OpenSplat")
         
         if success:
             print(f"[OpenSplat] Reconstruction finished. Result at {output_ply}")
+            self._extract_metrics(context)
         
         return success
+    
+    def _extract_metrics(self, context: ReconstructionContext):
+        """Extract and store Gaussian Splatting metrics from training logs."""
+        import re
+        metrics = {
+            "stage": "GaussianSplatting",
+            "final_loss": None,
+            "gaussian_count": None,
+            "status": "Success"
+        }
+        
+        # OpenSplat logs are stored in context.log_path / opensplat_*.log
+        log_files = list(context.log_path.glob("opensplat_*.log"))
+        if log_files:
+            # Get the most recent log file
+            latest_log = max(log_files, key=lambda x: x.stat().st_mtime)
+            
+            try:
+                with open(latest_log, "r") as f:
+                    log_content = f.read()
+                    
+                    # 1. Loss from OpenSplat format: "Step 2000: 0.103071 (100%)"
+                    loss_matches = re.findall(r"Step\s+\d+:\s+([\d.]+)", log_content)
+                    if loss_matches:
+                        metrics["loss_history"] = [float(l) for l in loss_matches]
+                        metrics["final_loss"] = float(loss_matches[-1])
+                    
+                    # 2. Gaussian Count: Try parsing from log "gaussians remaining" pattern
+                    count_matches = re.findall(r"([\d,]+)\s*gaussians?\s*(?:remaining)?", log_content, re.IGNORECASE)
+                    if count_matches:
+                        # Remove commas and get last value
+                        metrics["gaussian_count"] = int(count_matches[-1].replace(",", ""))
+                        
+            except Exception as e:
+                print(f"[OpenSplat] Warning: Could not parse logs for metrics: {e}")
+        
+        # 3. Fallback: Get gaussian count from PLY file header
+        if metrics["gaussian_count"] is None:
+            splat_ply = context.run_dir / "3d_gsl" / "splat.ply"
+            if splat_ply.exists():
+                try:
+                    with open(splat_ply, "rb") as f:
+                        header = f.read(2048).decode(errors='ignore')
+                        # PLY header: "element vertex 123456"
+                        v_match = re.search(r"element vertex (\d+)", header)
+                        if v_match:
+                            metrics["gaussian_count"] = int(v_match.group(1))
+                except Exception as e:
+                    print(f"[OpenSplat] Warning: Could not parse PLY header: {e}")
+                
+        context.metrics["reconstruction"] = metrics
+

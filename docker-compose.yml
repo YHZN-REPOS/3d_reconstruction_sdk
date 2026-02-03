@@ -19,7 +19,7 @@
 services:
   sdk:
     build: .
-    image: recon3d-sdk:latest
+    image: recon3d-sdk:${VERSION:-latest}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Sync time with host
@@ -40,7 +40,7 @@ services:
   # Development mode: mounts local code, no rebuild needed
   sdk-dev:
     build: .
-    image: recon3d-sdk:latest
+    image: recon3d-sdk:${VERSION:-latest}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
@@ -63,7 +63,7 @@ services:
   # Usage: docker compose --profile shell run --rm shell
   shell:
     build: .
-    image: recon3d-sdk:latest
+    image: recon3d-sdk:${VERSION:-latest}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
