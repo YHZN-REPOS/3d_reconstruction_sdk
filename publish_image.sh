@@ -38,11 +38,13 @@ git add .
 # 允许无变更提交（用于仅重新打标签的情况，虽然不推荐）
 git commit -m "chore: release version $VERSION" || echo "提醒: 无代码变更需要提交"
 
+TAG_OVERWRITTEN=false
 echo "[4/4] 正在处理 Git 标签 (v$VERSION)..."
 # 如果标签已存在，先删除本地标签，以便重新打标
 if git rev-parse "v$VERSION" >/dev/null 2>&1; then
     echo "提醒: 标签 v$VERSION 已存在，正在删除并重新提交..."
     git tag -d "v$VERSION"
+    TAG_OVERWRITTEN=true
 fi
 
 git tag -a "v$VERSION" -m "Release version $VERSION"
@@ -53,5 +55,9 @@ echo "版本号: $VERSION"
 echo "-----------------------------------------------------------------"
 echo "请手动执行以下命令推送到远程仓库:"
 echo "  git push origin $(git rev-parse --abbrev-ref HEAD)"
-echo "  git push origin v$VERSION"
+if [ "$TAG_OVERWRITTEN" = true ]; then
+    echo "  git push origin v$VERSION --force"
+else
+    echo "  git push origin v$VERSION"
+fi
 echo "================================================================="
