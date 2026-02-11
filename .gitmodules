@@ -1,0 +1,3 @@
+[submodule "3DGS-to-PC"]
+	path = 3DGS-to-PC
+	url = git@github.com:YHZN-REPOS/3DGS-to-PC.git
