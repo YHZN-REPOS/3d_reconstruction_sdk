@@ -1,0 +1,48 @@
+# Use a base image that is likely already cached or from a reliable source
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
+
+# Set non-interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Optimize apt for China (Tsinghua mirror)
+RUN sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list && \
+    sed -i 's/security.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    build-essential \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Set CUDA Architecture: 8.9 is for RTX 40-series (including your 4060 Ti)
+# This speeds up build by 6x compared to compiling for all architectures
+ENV TORCH_CUDA_ARCH_LIST="8.9"
+
+# 1. Install standard python dependencies using Tsinghua mirror
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install --no-cache-dir \
+    "numpy<2.0.0" \
+    configargparse \
+    imageio \
+    tqdm \
+    plyfile \
+    scipy \
+    opencv-python-headless
+
+# 2. Copy ONLY the rasterizer source first to cache the heavy compilation
+# This step requires a GPU during build if using some nvcc checks,
+# but usually devel image handles it.
+COPY 3DGS-to-PC/gaussian-pointcloud-rasterization /app/gaussian-pointcloud-rasterization
+RUN cd gaussian-pointcloud-rasterization && pip install .
+
+# 3. Copy the rest of the project (if you edit gauss_to_pc.py, this won't trigger re-compile)
+# Assumes the source code is in a directory named '3DGS-to-PC' relative to this Dockerfile
+COPY 3DGS-to-PC/ /app/
+
+# Set entrypoint to the conversion script
+ENTRYPOINT ["python", "gauss_to_pc.py"]

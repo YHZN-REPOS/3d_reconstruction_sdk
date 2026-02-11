@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 from my_sdk.core.interfaces import SfMStrategy, ReconstructionContext
 from my_sdk.utils.docker_runner import DockerRunner
+from my_sdk.utils.opensfm_exporter import convert_opensfm_to_nerf
 
 class OpenSfMAdapter(SfMStrategy):
     """
@@ -28,11 +29,22 @@ class OpenSfMAdapter(SfMStrategy):
         reconstruction_json = odm_project / "opensfm" / "reconstruction.json"
         
         # Initialize Docker runner with logging
-        runner = DockerRunner(log_dir=context.log_path)
+        runner = DockerRunner()
         
         # If resuming and output exists, skip SfM
         if reconstruction_json.exists():
-             print(f"[ODM/OpenSfM] Found existing reconstruction at {reconstruction_json}. Skipping SfM step.")
+             print(f"[ODM/OpenSfM] Found existing reconstruction at {reconstruction_json}.")
+             
+             # --- Auto-generate missing transforms.json on resume ---
+             transforms_json = context.run_dir / "transforms.json"
+             if not transforms_json.exists():
+                 print(f"[ODM/OpenSfM] transforms.json is missing, regenerating from existing results...")
+                 try:
+                     convert_opensfm_to_nerf(reconstruction_json, transforms_json, images_relative_path="../../images")
+                 except Exception as e:
+                     print(f"[ODM/OpenSfM] Warning: Failed to regenerate transforms.json on resume: {e}")
+             
+             print(f"[ODM/OpenSfM] Skipping SfM step.")
              return True
 
         images_src = Path(context.config.input_images_dir)
@@ -164,8 +176,21 @@ class OpenSfMAdapter(SfMStrategy):
         
         # 5. Extract Metrics if successful
         if success:
-            self._extract_metrics(context)
+            print("[ODM/OpenSfM] Reconstruction finished.")
             
+            # --- Default Extra Export: NeRF format (transforms.json) ---
+            # This is used by 3DGS-to-PC and other downstream tools
+            try:
+                reconstruction_json = context.run_dir / "opensfm" / "reconstruction.json"
+                transforms_json = context.run_dir / "transforms.json"
+                
+                print(f"[ODM/OpenSfM] Exporting NeRF transforms.json to {transforms_json}...")
+                convert_opensfm_to_nerf(reconstruction_json, transforms_json, images_relative_path="../../images")
+            except Exception as e:
+                print(f"[ODM/OpenSfM] Warning: Failed to export NeRF transforms: {e}")
+            
+            self._extract_metrics(context)
+        
         return success
     
     def _extract_metrics(self, context: ReconstructionContext):

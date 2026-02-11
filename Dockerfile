@@ -20,7 +20,7 @@ COPY my_sdk /app/my_sdk
 ENV PYTHONPATH=/app
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple pydantic pyyaml
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple pydantic pyyaml "numpy<2.0.0" "opencv-python-headless>=4.5"
 
 # Entrypoint to run the SDK CLI
 # User can pass arguments like: --config /data/config.json

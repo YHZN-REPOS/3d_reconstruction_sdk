@@ -32,16 +32,13 @@ camera:
 algorithms:
   sfm: opensfm
   reconstruction: opensplat
-  sfm_docker_image: opendronemap/odm:latest
-  reconstruction_docker_image: opensplat:latest
+  sfm_docker_image: opendronemap/odm:gpu
+  reconstruction_docker_image: opensplat-dev:latest
+  gs_to_pc_docker_image: gs2pc-tool:latest
 
 # --- 算法级细调 ---
 feature_type: sift      # 关键点提取算法: sift (最稳健), akaze, hahog
 sh_degree: 3            # 高斯溅射球谐函数阶数 (1-3)，影响色彩丰富度
-
-# --- 性能与系统 ---
-thread_num: 8           # 并行处理线程数
-video_memory_limit: 8192 # 显存限制 (MB)
 
 # --- 深度参数透传 ---
 # 可以直接向底层工具（如 OpenSfM 或 OpenSplat）传递特定参数
@@ -50,3 +47,5 @@ params:
     feature_process_size: 2048
   opensplat:
     iterations: 15000
+    save-every: 2000               # 每隔多少轮保存一次模型（等价于 -s）
+    auto-stop-on-same-size: true   # 需配合 save-every 使用

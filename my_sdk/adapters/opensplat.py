@@ -16,23 +16,32 @@ class OpenSplatAdapter(ReconstructionStrategy):
         print("[OpenSplat] Starting Gaussian Splatting reconstruction...")
         
         # Initialize Docker runner with logging
-        runner = DockerRunner(log_dir=context.log_path)
+        runner = DockerRunner()
         
         # 1. Setup Output Directory
         # Use 3d_gsl/ subdirectory for Gaussian Splatting results
         gsl_output_dir = context.run_dir / "3d_gsl"
         gsl_output_dir.mkdir(parents=True, exist_ok=True)
         output_ply = gsl_output_dir / "splat.ply"
+        opensfm_dir = context.run_dir / "opensfm"
         
         # Check if output exists (Resume capability)
         if output_ply.exists():
             print(f"[OpenSplat] Found existing result at {output_ply}. Skipping reconstruction.")
+            # Ensure metrics are extracted for the report even on resume
+            self._extract_metrics(context)
             return True
+
+        if not opensfm_dir.exists():
+            print(f"[OpenSplat] ERROR: OpenSfM directory not found: {opensfm_dir}")
+            print("[OpenSplat] Make sure the SfM stage completed successfully before running Gaussian Splatting.")
+            return False
         
         # 2. Build Splat Parameters
         splat_params = {
             "sh-degree": context.config.sh_degree,
-            "keep-crs": True  # Maintain original point cloud scale and CRS
+            "keep-crs": True,  # Maintain original point cloud scale and CRS
+            "auto-stop-on-same-size": True  # Enable OpenSplat auto-stop by default
         }
         
         # Mapping quality logic
@@ -51,6 +60,9 @@ class OpenSplatAdapter(ReconstructionStrategy):
         # Map 'iterations' to 'n' for backward compatibility
         if "iterations" in user_overrides:
             user_overrides["n"] = user_overrides.pop("iterations")
+        # Normalize save frequency to short option (-s) to avoid duplicate flags
+        if "save-every" in user_overrides:
+            user_overrides["s"] = user_overrides.pop("save-every")
         splat_params.update(user_overrides)
 
         # 3. Construct Docker Command with DooD (Docker-outside-of-Docker)
@@ -78,6 +90,7 @@ class OpenSplatAdapter(ReconstructionStrategy):
         # Container paths
         container_project = "/project"
         container_images = "/images"
+        container_opensfm = f"{container_project}/opensfm"
         container_output = f"{container_project}/3d_gsl/splat.ply"
         
         # Build Docker command
@@ -89,7 +102,7 @@ class OpenSplatAdapter(ReconstructionStrategy):
             "-e", "NVIDIA_DRIVER_CAPABILITIES=all",
             docker_image,
             "opensplat",
-            container_project,                          # Input: OpenSfM project directory
+            container_opensfm,                          # Input: OpenSfM project directory
             "-o", container_output,                     # Output: PLY file
             "--opensfm-image-path", container_images,   # Separate images path
         ]
@@ -131,30 +144,35 @@ class OpenSplatAdapter(ReconstructionStrategy):
             "status": "Success"
         }
         
-        # OpenSplat logs are stored in context.log_path / opensplat_*.log
-        log_files = list(context.log_path.glob("opensplat_*.log"))
-        if log_files:
-            # Get the most recent log file
-            latest_log = max(log_files, key=lambda x: x.stat().st_mtime)
-            
+        # Prefer unified sdk.log if present; fallback to opensplat_*.log (legacy)
+        log_content = ""
+        sdk_log = context.log_path / "sdk.log"
+        if sdk_log.exists():
             try:
-                with open(latest_log, "r") as f:
-                    log_content = f.read()
-                    
-                    # 1. Loss from OpenSplat format: "Step 2000: 0.103071 (100%)"
-                    loss_matches = re.findall(r"Step\s+\d+:\s+([\d.]+)", log_content)
-                    if loss_matches:
-                        metrics["loss_history"] = [float(l) for l in loss_matches]
-                        metrics["final_loss"] = float(loss_matches[-1])
-                    
-                    # 2. Gaussian Count: Try parsing from log "gaussians remaining" pattern
-                    count_matches = re.findall(r"([\d,]+)\s*gaussians?\s*(?:remaining)?", log_content, re.IGNORECASE)
-                    if count_matches:
-                        # Remove commas and get last value
-                        metrics["gaussian_count"] = int(count_matches[-1].replace(",", ""))
-                        
+                log_content = sdk_log.read_text(encoding="utf-8", errors="ignore")
             except Exception as e:
-                print(f"[OpenSplat] Warning: Could not parse logs for metrics: {e}")
+                print(f"[OpenSplat] Warning: Could not read sdk.log: {e}")
+        else:
+            log_files = list(context.log_path.glob("opensplat_*.log"))
+            if log_files:
+                latest_log = max(log_files, key=lambda x: x.stat().st_mtime)
+                try:
+                    log_content = latest_log.read_text(encoding="utf-8", errors="ignore")
+                except Exception as e:
+                    print(f"[OpenSplat] Warning: Could not parse logs for metrics: {e}")
+
+        if log_content:
+            # 1. Loss from OpenSplat format: "Step 2000: 0.103071 (100%)"
+            loss_matches = re.findall(r"Step\s+\d+:\s+([\d.]+)", log_content)
+            if loss_matches:
+                metrics["loss_history"] = [float(l) for l in loss_matches]
+                metrics["final_loss"] = float(loss_matches[-1])
+            
+            # 2. Gaussian Count: Try parsing from log "gaussians remaining" pattern
+            count_matches = re.findall(r"([\d,]+)\s*gaussians?\s*(?:remaining)?", log_content, re.IGNORECASE)
+            if count_matches:
+                # Remove commas and get last value
+                metrics["gaussian_count"] = int(count_matches[-1].replace(",", ""))
         
         # 3. Fallback: Get gaussian count from PLY file header
         if metrics["gaussian_count"] is None:
@@ -171,4 +189,3 @@ class OpenSplatAdapter(ReconstructionStrategy):
                     print(f"[OpenSplat] Warning: Could not parse PLY header: {e}")
                 
         context.metrics["reconstruction"] = metrics
-

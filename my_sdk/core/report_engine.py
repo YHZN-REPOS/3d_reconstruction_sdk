@@ -50,7 +50,11 @@ class ReportEngine:
         if "reconstruction" in self.metrics:
             md_lines.extend(self._build_splat_section(self.metrics["reconstruction"]))
 
-        # 6. Add Conclusion/Advice
+        # 6. Add GS to Point Cloud Metrics
+        if "gs_to_pc" in self.metrics:
+            md_lines.extend(self._build_gs_to_pc_section(self.metrics["gs_to_pc"]))
+
+        # 7. Add Conclusion/Advice
         md_lines.extend(self._build_conclusion())
 
         # 6. Save to file
@@ -93,20 +97,38 @@ class ReportEngine:
             
         if "reconstruction" in self.metrics:
             d = self.metrics["reconstruction"].get("duration_seconds")
-            section.append(f"- **高斯泼溅 (GS)**: {format_duration(d)}")
+            section.append(f"- **稠密重建 (GS)**: {format_duration(d)}")
+
+        if "gs_to_pc" in self.metrics:
+            d = self.metrics["gs_to_pc"].get("duration_seconds")
+            section.append(f"- **高斯转点云 (GS2PC)**: {format_duration(d)}")
             
         return section
 
     def _build_sfm_section(self, data: dict) -> list:
         status_zh = "成功" if data.get("status") == "Success" else "失败/部分完成"
-        rate = data.get("registration_rate", 0) * 100
+        
+        registered = data.get('registered_images')
+        total = data.get('total_images')
+        sparse_pts = data.get('sparse_points')
         error = data.get("reprojection_error")
+        
+        # Calculate rate safely
+        if registered is not None and total is not None and total > 0:
+            rate = (registered / total) * 100
+            rate_str = f"{rate:.1f}%"
+            align_str = f"{registered} / {total} ({rate_str})"
+        else:
+            align_str = "N/A"
+        
+        # Format sparse points safely
+        sparse_str = f"{sparse_pts:,}" if sparse_pts is not None else "N/A"
         
         section = [
             "## 1. 稀疏重建精度 (SfM)",
             f"- **执行状态**: {status_zh}",
-            f"- **图像对齐率**: {data.get('registered_images')} / {data.get('total_images')} ({rate:.1f}%)",
-            f"- **稀疏点云密度**: {data.get('sparse_points'):,} 个空间点",
+            f"- **图像对齐率**: {align_str}",
+            f"- **稀疏点云密度**: {sparse_str} 个空间点",
         ]
         
         if error is not None:
@@ -135,8 +157,10 @@ class ReportEngine:
                 section.append("")
 
         # Warning for low registration
-        if rate < 80:
-             section.append(f"\n> ⚠️ **建议**: 图像对齐率较低 ({rate:.1f}%)。请检查输入照片的重叠度（建议 70% 以上）或光照条件。")
+        if registered is not None and total is not None and total > 0:
+            rate = (registered / total) * 100
+            if rate < 80:
+                section.append(f"\n> ⚠️ **建议**: 图像对齐率较低 ({rate:.1f}%)。请检查输入照片的重叠度（建议 70% 以上）或光照条件。")
         
         section.append("")
         return section
@@ -182,15 +206,32 @@ class ReportEngine:
         loss = data.get("final_loss")
         count = data.get("gaussian_count")
         
+        loss_str = f"{loss:.6f}" if (loss is not None) else "N/A"
+        count_str = f"{count:,}" if (count is not None) else "N/A"
+        
         section = [
             "## 3. 高斯泼溅质量 (Gaussian Splatting)",
-            f"- **训练集 Loss**: {f'{loss:.6f}' if loss else 'N/A'}",
-            f"- **高斯体总数**: {f'{count:,}' if count else 'N/A'} 个点"
+            f"- **训练集 Loss**: {loss_str}",
+            f"- **高斯体总数**: {count_str} 个点"
         ]
         
         if loss and loss > 0.1:
             section.append(f"\n> ⚠️ **注意**: 训练 Loss 较高 ({loss:.4f})。如果重建结果模糊，请尝试增加训练迭代次数。")
             
+        section.append("")
+        return section
+
+    def _build_gs_to_pc_section(self, data: dict) -> list:
+        count = data.get("point_count")
+        
+        count_str = f"{count:,}" if (count is not None) else "N/A"
+        
+        section = [
+            "## 3.5 高斯模型转稠密点云 (GS to Point Cloud)",
+            f"- **执行状态**: 成功",
+            f"- **点云顶点数**: {count_str} 个点"
+        ]
+        
         section.append("")
         return section
 
@@ -211,6 +252,10 @@ class ReportEngine:
         # GS outputs
         if self.context.config.run_gaussian:
             conclusion.append(f"- **高斯泼溅模型 (PLY)**: `3d_gsl/splat.ply`")
+
+        # GS to PC outputs
+        if self.context.config.run_gs_to_pc:
+            conclusion.append(f"- **稠密点云 (PLY, via GS)**: `3d_gsl/dense_pc.ply`")
             
         conclusion.extend([
             f"- **完整统计数据**: `metrics.json` (JSON 格式)",

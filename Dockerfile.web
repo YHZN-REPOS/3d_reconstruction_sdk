@@ -1,0 +1,23 @@
+ARG TARGETPLATFORM=linux/amd64
+FROM python:3.9-slim
+
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
+    docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY web /app/web
+COPY config.yaml /app/config.yaml
+COPY sample_config.yaml /app/sample_config.yaml
+
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    pyyaml \
+    fastapi==0.111.1 \
+    "uvicorn[standard]==0.30.3"
+
+EXPOSE 8000
+
+CMD ["uvicorn", "web.server:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -31,7 +31,19 @@ chmod +x publish_image.sh
 *   `docker tag ... latest` (更新本地最新标签)
 *   `git commit` & `git tag v1.0.1`
 
-### 3. 推送到远程
+### 3. 发布前 Submodule 检查
+如果本次版本涉及 `3DGS-to-PC`，发布前先执行以下检查：
+
+```bash
+git submodule status
+git -C 3DGS-to-PC log --oneline -n 1
+```
+
+要求：
+* `3DGS-to-PC` 对应 commit 已经推送到远端 `git@github.com:YHZN-REPOS/3DGS-to-PC.git`
+* 父仓库提交中已包含最新 submodule 指针（`git add 3DGS-to-PC` 后提交）
+
+### 4. 推送到远程
 脚本执行完成后，按提示手动推送：
 
 ```bash
@@ -54,3 +66,6 @@ A: 直接使用 `docker compose build` 即可，它会默认使用 `latest` 标�
 
 **Q: 标签打错了能改吗？**
 A: 可以，但建议通过递增版本号（如 `1.0.2`）来解决，而不是覆盖旧标签，以保持历史记录的完整性。
+
+**Q: 发布机构建失败，提示缺少 `3DGS-to-PC` 文件怎么办？**
+A: 通常是拉取代码时没有初始化 submodule。请使用 `git clone --recurse-submodules`，或在已有仓库执行 `git submodule update --init --recursive`。

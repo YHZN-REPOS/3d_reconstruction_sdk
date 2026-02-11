@@ -208,7 +208,8 @@ class DockerRunner:
 def setup_logging(
     level: int = logging.INFO,
     log_file: Optional[Path] = None,
-    format_string: str = "%(asctime)s [%(levelname)s] %(message)s"
+    format_string: str = "%(asctime)s [%(levelname)s] %(message)s",
+    stream=None
 ):
     """
     Configure SDK logging.
@@ -218,7 +219,7 @@ def setup_logging(
         log_file: Optional file path to also write logs to
         format_string: Log message format
     """
-    handlers = [logging.StreamHandler()]
+    handlers = [logging.StreamHandler(stream)]
     
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)

@@ -40,6 +40,7 @@ class AlgorithmConfig(BaseModel):
     # Docker Configuration
     sfm_docker_image: str = "opendronemap/odm:latest"  # ODM includes OpenSfM
     reconstruction_docker_image: str = "opensplat:latest"
+    gs_to_pc_docker_image: str = "gs2pc-tool:latest"
 
 class TaskConfig(BaseModel):
     # Core Paths - working_dir contains all project data
@@ -54,6 +55,7 @@ class TaskConfig(BaseModel):
     run_sparse: bool = True          # Sparse Reconstruction (SfM)
     run_mesh: bool = False           # 3D Mesh (via ODM)
     run_gaussian: bool = True        # Gaussian Splatting
+    run_gs_to_pc: bool = False       # 3DGS to Point Cloud conversion
     
     # High-level Business Parameters
     camera: CameraConfig = Field(default_factory=CameraConfig, description="Camera intrinsic parameters")
@@ -68,10 +70,6 @@ class TaskConfig(BaseModel):
     # Key = algorithm name (e.g. "opensfm", "colmap"), Value = param dict
     # Optional for "Ordinary Users" (Merged with presets)
     params: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
-    
-    # System settings
-    thread_num: int = Field(default=8, ge=1)
-    video_memory_limit: int = Field(default=8192, description="VRAM Limit in MB")
     
     @property
     def input_images_dir(self) -> str:
@@ -97,8 +95,6 @@ class TaskConfig(BaseModel):
         
         
         # Priority 1: DATA_DIR environment variable (Override)
-        env_data_dir = os.environ.get("DATA_DIR")
-        # Priority 1: DATA_DIR environment variable (set to /project in Docker)
         env_data_dir = os.environ.get("DATA_DIR")
         if env_data_dir:
              data['working_dir'] = str(Path(env_data_dir).resolve())
@@ -128,8 +124,6 @@ class TaskConfig(BaseModel):
         
         
         # Priority 1: DATA_DIR environment variable (Override)
-        env_data_dir = os.environ.get("DATA_DIR")
-        # Priority 1: DATA_DIR environment variable (set to /project in Docker)
         env_data_dir = os.environ.get("DATA_DIR")
         if env_data_dir:
              data['working_dir'] = str(Path(env_data_dir).resolve())

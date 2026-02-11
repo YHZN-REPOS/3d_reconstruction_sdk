@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Reconstruction Web</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <div class="brand-title">3D Reconstruction Console</div>
+        <div class="brand-subtitle">Config, Runs, Logs, Results in one place</div>
+      </div>
+    </div>
+    <div class="status-pill" id="global-status">Idle</div>
+  </header>
+
+  <main class="grid">
+    <section class="panel config-panel">
+      <div class="panel-header">
+        <h2>Config</h2>
+        <div class="config-path" id="config-path"></div>
+      </div>
+
+      <form id="config-form" class="form">
+        <div class="field-group">
+          <div class="field">
+            <label>Sparse (SfM)</label>
+            <input type="checkbox" id="run_sparse" />
+          </div>
+          <div class="field">
+            <label>Mesh (ODM)</label>
+            <input type="checkbox" id="run_mesh" />
+          </div>
+          <div class="field">
+            <label>Gaussian</label>
+            <input type="checkbox" id="run_gaussian" />
+          </div>
+          <div class="field">
+            <label>GS to PC</label>
+            <input type="checkbox" id="run_gs_to_pc" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field">
+            <label>Use GPS</label>
+            <input type="checkbox" id="use_gps" />
+          </div>
+          <div class="field">
+            <label>Quality Preset</label>
+            <select id="quality_preset">
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Feature Type</label>
+            <select id="feature_type">
+              <option value="sift">sift</option>
+              <option value="akaze">akaze</option>
+              <option value="orb">orb</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>SH Degree</label>
+            <input type="number" id="sh_degree" min="1" max="3" step="1" />
+          </div>
+        </div>
+
+        <div class="section-title">Algorithms & Images</div>
+        <div class="field-group">
+          <div class="field">
+            <label>SfM Algorithm</label>
+            <input type="text" id="alg_sfm" />
+          </div>
+          <div class="field">
+            <label>Reconstruction Algorithm</label>
+            <input type="text" id="alg_reconstruction" />
+          </div>
+          <div class="field">
+            <label>SfM Image</label>
+            <input type="text" id="alg_sfm_image" list="images-odm" />
+            <datalist id="images-odm"></datalist>
+          </div>
+          <div class="field">
+            <label>Reconstruction Image</label>
+            <input type="text" id="alg_reconstruction_image" list="images-opensplat" />
+            <datalist id="images-opensplat"></datalist>
+          </div>
+          <div class="field">
+            <label>GS2PC Image</label>
+            <input type="text" id="alg_gs_to_pc_image" list="images-gs2pc" />
+            <datalist id="images-gs2pc"></datalist>
+          </div>
+        </div>
+
+      <div class="section-title">Key Params</div>
+      <div class="field">
+        <label>OpenSplat Iterations</label>
+        <input type="number" id="opensplat_iterations" min="1" step="1" />
+      </div>
+      <div class="field">
+        <label>OpenSplat Save Every</label>
+        <input type="number" id="opensplat_save_every" min="1" step="1" />
+      </div>
+      <div class="field">
+        <label>OpenSplat Auto Stop</label>
+        <input type="checkbox" id="opensplat_auto_stop" />
+      </div>
+
+        <div class="actions">
+          <div class="button-with-help">
+            <button type="button" class="primary" id="save-basic">Save Config</button>
+            <button type="button" class="help" data-tooltip="Save form values to config.yaml (basic validation).">?</button>
+          </div>
+          <div class="button-with-help">
+            <button type="button" class="ghost" id="save-validate">Save + Validate Paths</button>
+            <button type="button" class="help" data-tooltip="Save and validate images/ path exists.">?</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="section-title">Advanced YAML</div>
+      <textarea id="yaml-editor" spellcheck="false"></textarea>
+      <div class="actions">
+        <div class="button-with-help">
+          <button type="button" class="ghost" id="reload-yaml">Reload</button>
+          <button type="button" class="help" data-tooltip="Reload YAML from config.yaml.">?</button>
+        </div>
+        <div class="button-with-help">
+          <button type="button" class="ghost" id="load-template">Load Template</button>
+          <button type="button" class="help" data-tooltip="Load full template into editor.">?</button>
+        </div>
+        <div class="button-with-help">
+          <button type="button" class="primary" id="save-yaml">Save YAML</button>
+          <button type="button" class="help" data-tooltip="Save YAML editor content to config.yaml.">?</button>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="panel task-panel">
+      <div class="panel-header">
+        <h2>Tasks</h2>
+        <div class="run-controls">
+          <div class="button-with-help">
+            <button id="start-run" class="primary">Start Run</button>
+            <button type="button" class="help" data-tooltip="Start a new reconstruction run.">?</button>
+          </div>
+          <div class="button-with-help">
+            <button id="stop-run" class="ghost">Stop Run</button>
+            <button type="button" class="help" data-tooltip="Stop the current run (SIGTERM).">?</button>
+          </div>
+        </div>
+      </div>
+      <div class="field sdk-image-field">
+        <label>SDK Image</label>
+        <input type="text" id="sdk_image_input" list="images-sdk" />
+        <datalist id="images-sdk"></datalist>
+      </div>
+      <div class="config-path" id="sdk-image"></div>
+
+      <div class="run-meta">
+        <div>Current Run: <span id="active-run">-</span></div>
+        <div>Status: <span id="active-status">-</span></div>
+      </div>
+
+      <div class="section-title">Run Logs</div>
+      <pre id="log-output" class="log-output"></pre>
+
+      <div class="section-title">History</div>
+      <div id="run-list" class="run-list"></div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+  <div id="tooltip" class="tooltip" role="tooltip" aria-hidden="true"></div>
+</body>
+</html>

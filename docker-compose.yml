@@ -59,6 +59,23 @@ services:
     profiles:
       - dev
 
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: recon3d-web:${VERSION:-latest}
+    ports:
+      - ${WEB_PORT:-8000}:8000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+      - ${DATA_DIR}:/project
+    environment:
+      - DATA_DIR=/project
+      - HOST_DATA_DIR=${DATA_DIR}
+      - SDK_IMAGE=${SDK_IMAGE:-recon3d-sdk:latest}
+      - PYTHONUNBUFFERED=1
+
   # Shell mode: enter container for debugging/cleanup
   # Usage: docker compose --profile shell run --rm shell
   shell:
@@ -80,3 +97,19 @@ services:
     tty: true
     profiles:
       - shell
+
+  # 3DGS to Point Cloud conversion service
+  gs2pc:
+    build:
+      context: .
+      dockerfile: Dockerfile.gs2pc
+    image: gs2pc-tool:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - tools

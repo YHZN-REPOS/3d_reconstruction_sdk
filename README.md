@@ -16,6 +16,8 @@
     *   算法迭代后的镜像打包、版本管理（SemVer）与 Git 提交同步流程。
 *   **[架构设计说明书](docs/architecture_design.md)**
     *   系统层面的模块化架构、DooD 调度机制与跨容器数据流向。
+*   **[Web 控制台使用说明](docs/web_console.md)**
+    *   Web 端配置、运行、日志与结果下载的使用说明。
 
 ### 研究与参考
 
@@ -44,6 +46,69 @@
 1.  **重构 Adapters**: 实现 `OpenSfMWindowsAdapter` 以调用 `.exe` 而非 `docker run`。
 2.  **交叉编译**: 在 Windows 上使用 MSVC/Ninja 源码编译 OpenSfM 和 OpenSplat。
 3.  **打包发布**: 使用 PyInstaller 将 Python SDK 打包为 `.exe`。
+
+## 第三方依赖 (Third-Party Dependencies)
+
+### 3DGS-to-PC (高斯模型转稠密点云)
+
+本项目集成了 [3DGS-to-PC](https://github.com/Lewis-Stuart-11/3DGS-to-PC) 工具，用于将 3D Gaussian Splatting 模型转换为高质量稠密点云。
+
+**论文引用:**
+```bibtex
+@InProceedings{A_G_Stuart_2025_ICCV,
+    author    = {A G Stuart, Lewis and Morton, Andrew and Stavness, Ian and Pound, Michael P},
+    title     = {3DGS-to-PC: 3D Gaussian Splatting to Dense Point Clouds},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) Workshops},
+    year      = {2025}
+}
+```
+
+**构建 Docker 镜像:**
+```bash
+# 首次构建（需编译 CUDA 扩展，约 5-10 分钟）
+docker compose build gs2pc
+
+# 后续如果只修改 Python 脚本，利用缓存秒级完成
+```
+
+> **注意**: 默认为 RTX 40 系显卡 (CUDA 8.9) 编译。若需支持其他显卡，修改 `Dockerfile.gs2pc` 中的 `TORCH_CUDA_ARCH_LIST` 环境变量。
+
+#### Submodule 使用说明
+
+`3DGS-to-PC` 现作为独立仓库以 Git submodule 方式集成到本项目。
+
+**首次拉取（推荐）**
+```bash
+git clone --recurse-submodules git@github.com:YHZN-REPOS/3d_reconstruction_sdk.git
+cd 3d_reconstruction_sdk
+```
+
+**已有仓库补齐 submodule**
+```bash
+git submodule update --init --recursive
+```
+
+**日常开发分流**
+- 只改主仓库代码：正常 `git add/commit`，不要在父仓库执行 `git add 3DGS-to-PC`。
+- 改 `3DGS-to-PC`：先在 `3DGS-to-PC` 子仓库提交并推送，再回到父仓库提交 submodule 指针变更。
+
+```bash
+# 在子仓库提交
+cd 3DGS-to-PC
+git checkout main
+# edit files...
+git add -A
+git commit -m "feat: update gs2pc logic"
+git push origin main
+
+# 在父仓库提交指针
+cd ..
+git add 3DGS-to-PC
+git commit -m "chore: bump 3DGS-to-PC submodule"
+```
+
+> [!IMPORTANT]
+> `3DGS-to-PC` 在父仓库中是 gitlink（提交指针），不是普通源码目录。父仓库不会直接跟踪其内部文件差异。
 
 ## 快速开始
 

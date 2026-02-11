@@ -13,6 +13,7 @@
 5. [Docker 集成](#docker-集成)
 6. [日志与调试](#日志与调试)
 7. [打包发布](#打包发布)
+8. [第三方算法仓库（Submodule）开发规范](#第三方算法仓库submodule开发规范)
 
 ---
 
@@ -282,3 +283,47 @@ docker build -t recon3d-sdk:latest .
 docker run -v /data:/data recon3d-sdk --config /data/config.yaml
 ```
 
+---
+
+## 第三方算法仓库（Submodule）开发规范
+
+`3DGS-to-PC` 作为独立仓库以 submodule 方式挂载在父仓库目录 `3DGS-to-PC/`。协作时请遵循以下流程。
+
+### 流程 A：更新 `3DGS-to-PC` 代码
+
+```bash
+# 1) 进入子仓库并提交改动
+cd 3DGS-to-PC
+git checkout main
+# edit files...
+git add -A
+git commit -m "feat: update gs2pc logic"
+git push origin main
+
+# 2) 回父仓库提交 submodule 指针
+cd ..
+git add 3DGS-to-PC
+git commit -m "chore: bump 3DGS-to-PC submodule"
+```
+
+### 流程 B：同步 upstream 到 fork，并升级父仓库
+
+```bash
+# 1) 在子仓库拉取上游并合并到 fork/main
+cd 3DGS-to-PC
+git remote add upstream https://github.com/Lewis-Stuart-11/3DGS-to-PC.git || true
+git fetch upstream
+git checkout main
+git merge upstream/main
+git push origin main
+
+# 2) 回父仓库提交新的 submodule 指针
+cd ..
+git add 3DGS-to-PC
+git commit -m "chore: bump 3DGS-to-PC submodule"
+```
+
+### 规则
+
+* 固定提交模式：不启用 submodule 自动跟踪分支，父仓库仅通过 commit 指针升级。
+* 评审要求：父仓库 PR 中必须明确 submodule commit 变化（建议配合 `git diff --submodule=log` 查看）。

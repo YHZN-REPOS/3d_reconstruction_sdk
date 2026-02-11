@@ -60,10 +60,13 @@ python -m my_sdk.main --config config.yaml
 └── runs/
     └── 20260127_143500/         # 每次运行自动创建
         ├── config.yaml          # 配置备份
+        ├── transforms.json      # NeRF 格式位姿 (自动导出)
+        ├── quality_report_zh.md # 中文质量报告
         ├── opensfm/             # OpenSfM/ODM 运行目录
         │   └── reconstruction.json
         ├── 3d_gsl/              # 高斯溅射输出
-        │   └── splat.ply        # 生成的模型
+        │   ├── splat.ply        # 高斯模型
+        │   └── dense_pc.ply     # 稠密点云 (高质量)
         └── logs/                # 实时执行日志
 
 ```
@@ -82,7 +85,7 @@ python -m my_sdk.main --config config.yaml
 
 ```bash
 # 1. 克隆代码仓库
-git clone git@github.com:YHZN-REPOS/3d_reconstruction_sdk.git
+git clone --recurse-submodules git@github.com:YHZN-REPOS/3d_reconstruction_sdk.git
 cd 3d_reconstruction_sdk
 
 # 2. 安装 Python 依赖
@@ -91,9 +94,41 @@ pip install pyyaml pydantic
 # 3. 安装 SDK 本体（开发模式）
 pip install -e .
 
-# 4. 拉取 Docker 镜像
+# 4. 拉取/构建 Docker 镜像
 docker pull opendronemap/odm:latest
 docker pull opensplat:latest
+
+# 5. 构建 3DGS-to-PC 转换镜像 (高斯模型转稠密点云)
+# 此步骤会编译 CUDA 扩展，首次耗时约 5-10 分钟，后续更新秒级缓存
+docker compose build gs2pc
+```
+
+> [!TIP]
+> `gs2pc` 镜像默认为 RTX 40 系显卡 (CUDA 8.9) 编译。若需支持其他显卡，修改 `Dockerfile.gs2pc` 中的 `TORCH_CUDA_ARCH_LIST` 环境变量。
+
+### Submodule 维护（3DGS-to-PC）
+
+`3DGS-to-PC` 已作为 Git submodule 集成。如果你是已有本地仓库（历史上未用 `--recurse-submodules` 克隆），请先补齐：
+
+```bash
+git submodule update --init --recursive
+```
+
+如果你修改了 `3DGS-to-PC` 子仓库代码，需要两次提交：
+
+```bash
+# 1) 在子仓库提交算法改动
+cd 3DGS-to-PC
+git checkout main
+# edit files...
+git add -A
+git commit -m "feat: update gs2pc logic"
+git push origin main
+
+# 2) 回父仓库提交 submodule 指针
+cd ..
+git add 3DGS-to-PC
+git commit -m "chore: bump 3DGS-to-PC submodule"
 ```
 
 ---
@@ -110,6 +145,7 @@ SDK 的配置分为 **基础配置** (面向普通用户) 和 **进阶配置** (
 |------|------|--------|------|
 | `run_sparse` | bool | `true` | 是否运行稀疏重建 (SfM)。是后续步骤的必要基础。 |
 | `run_gaussian` | bool | `true` | 是否运行高斯溅射模型生成。 |
+| `run_gs_to_pc` | bool | `false` | **新增**: 是否将高斯模型转换为稠密点云。建议在对 SfM 稠密点云不满意时开启。 |
 | `run_mesh` | bool | `false` | 是否生成 3D 网格模型 (由 ODM 驱动)。 |
 | `quality_preset` | string | `medium` | **重建质量预设**: `high`, `medium`, `low`。影响特征点密度和迭代次数。 |
 | `use_gps` | bool | `true` | 是否利用照片 GPS。开启可显著加速空三匹配并实现地理对齐。 |
@@ -127,7 +163,6 @@ SDK 的配置分为 **基础配置** (面向普通用户) 和 **进阶配置** (
 | `algorithms.sfm` | `opensfm` | 稀疏重建后端算法。 |
 | `algorithms.sfm_docker_image` | `opendronemap/odm:latest` | 使用的 Docker 镜像版本。 |
 | `feature_type` | `sift` | 关键点算法: `sift`, `akaze`, `hahog`。 |
-| `thread_num` | `8` | 宿主机并行处理的线程数。 |
 
 #### 深度参数透传 (`params`)
 此部分允许算法工程师直接向底层 Docker 容器中的算法发送原始命令参数。其优先级最高，会覆盖 `quality_preset` 的默认映射。
@@ -138,6 +173,11 @@ params:
     feature_process_size: 2048   # 强制指定特征处理分辨率
   opensplat:
     iterations: 20000            # 指定高斯溅射训练迭代次数
+    save-every: 2000             # 每隔多少轮保存一次模型（等价于 -s）
+    auto-stop-on-same-size: true # 需配合 save-every 使用；连续两次保存模型大小相同则自动停止
+  gs_to_pc:
+    num_points: 10000000         # 目标生成点数
+    visibility_threshold: 0.05   # 过滤噪声阈值
 ```
 
 ---
@@ -222,6 +262,12 @@ DATA_DIR=/home/user/my_project
 CONFIG_FILE=/data/config.yaml
 ```
 
+### 方式六：Web 控制台
+
+通过 Web 方式进行配置编辑、任务启停、日志查看和结果下载。
+
+详细说明参见：`docs/web_console.md`
+
 ```bash
 docker compose run --rm sdk
 ```
@@ -292,6 +338,7 @@ SDK 的执行过程分为以下几个阶段：
 - **特征提取**: 从输入的原始图像中识别特征点（默认使用 SIFT 算法）。
 - **特征匹配**: 在不同图像之间通过特征点进行几何关联。
 - **稀疏重建**: 通过几何计算确定相机的内参、位置、姿态，并生成稀疏的点云（Tie Points）。
+- **默认导出**: 自动生成 `3d_gsl/transforms.json` (NeRF 格式)，确保与常用三维工具链的兼容性。
 - **输出**: 生成包含相机位姿和稀疏点云的 `reconstruction.json` 及其相关中间文件。
 
 ### 3. 三维网格生成 (Mesh Generation - 可选)
@@ -305,6 +352,18 @@ SDK 的执行过程分为以下几个阶段：
 - **模型学习**: 通过亚像素级的优化过程，学习每个高斯的几何属性（位置、缩放、旋转）和辐射属性（颜色、不透明度）。
 - **优化迭代**: 根据 `quality_preset` 决定迭代次数，持续提升场景重建质量。
 - **输出**: 生成代表场景的 `.ply` 格式高斯溅射模型。
+
+### 5. 高斯模型转稠密点云 (GS to Point Cloud - 3DGS-to-PC)
+
+此阶段将训练完成的高斯模型转换为传统的稠密点云格式。
+
+- **原理**: 通过重要性采样从训练好的高斯模型中提取三维点，并通过相机投影渲染真实的颜色，生成比传统多视图几何（MVS）更清晰、噪点更少的稠密点云。
+- **自动格式转换**: SDK 会自动将 OpenSfM 的 `reconstruction.json` 转换为 NeRF 格式的 `transforms.json`，确保与 3DGS-to-PC 工具的兼容性。用户无需手动处理。
+- **断点续行**: 自动检测 `dense_pc.ply`，如果已存在则跳过。
+- **输出**: 产出 `3d_gsl/dense_pc.ply` 稠密点云文件（默认 1000 万个点）。
+
+> [!NOTE]
+> 此阶段依赖 GPU 进行颜色渲染。渲染后的点云颜色接近照片质量，适合展示和分析。若只需几何信息，可通过配置 `params.gs_to_pc.no_render_colours: true` 跳过渲染以极大加速。
 
 ---
 
@@ -333,6 +392,7 @@ SDK 的执行过程分为以下几个阶段：
 | :--- | :--- | :--- | :--- |
 | `opensfm/reconstruction.json` | 核心数据 | 包含所有已恢复相机的位姿、内参以及稀疏点云。 | 外部程序调用位姿数据，或作为后续训练的基础。 |
 | `3d_gsl/splat.ply` | 最终成果 | 生成的高斯溅射模型，包含场景的所有几何与色彩信息。 | **三维可视化**，支持在 CloudCompare 或专用渲染器中查看。 |
+| `3d_gsl/dense_pc.ply` | 最终成果 | 从高斯模型转换而来的**模型化点云**。 | 用于测量、分类或作为高品质渲染数据。 |
 | `odm_report/report.pdf` | 质量报告 | 由 ODM 自动生成的 PDF，包含空三精度、重叠度热力图等。 | **质量验收**，直观判断重建是否成功。 |
 | `logs/main.log` | 系统日志 | 记录了 SDK 调度算法容器的完整过程。 | **故障排查**，定位运行错误的原因。 |
 | `opensfm/undistorted/` | 中间目录 | 经过校正、去除畸变后的图像集合。 | 用于高斯溅射训练的标准化输入。 |
@@ -387,14 +447,31 @@ docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
 
 检查 SfM 是否成功完成。高斯溅射需要 SfM 的输出作为输入。
 
+### Q: `3DGS-to-PC` 目录为空或缺文件
+
+这是 submodule 未初始化的典型现象。执行：
+
+```bash
+git submodule update --init --recursive
+```
+
+### Q: `git submodule add` 提示 `path is ignored by one of your .gitignore files`
+
+先定位是哪条忽略规则命中，再处理：
+
+```bash
+git check-ignore -v --no-index 3DGS-to-PC 3DGS-to-PC/
+git submodule add -f git@github.com:YHZN-REPOS/3DGS-to-PC.git 3DGS-to-PC
+```
+
+如果输出命中的是项目 `.gitignore`、`.git/info/exclude` 或全局 `core.excludesfile`，请删除对应规则后重试。
+
 ---
 
 ## 完整配置示例
 
 ```yaml
 # config.yaml - 放在项目目录下，working_dir 自动推断
-thread_num: 8
-
 run_sparse: true
 run_gaussian: true
 
@@ -409,5 +486,3 @@ algorithms:
   sfm_docker_image: opendronemap/odm:latest
   reconstruction_docker_image: opensplat:latest
 ```
-
-

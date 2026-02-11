@@ -6,6 +6,7 @@ images/
 *.json
 !my_sdk/**/*.json
 
+
 # --- Environment ---
 .env
 .venv/
